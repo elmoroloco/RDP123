@@ -1,4 +1,4 @@
-name: Window 10 - LocalTunnel
+name: Window 10 - LocalTunnel 6H
 
 on: [push, workflow_dispatch]
 
