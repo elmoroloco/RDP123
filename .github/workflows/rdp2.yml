@@ -1,4 +1,4 @@
-name: Window 10
+name: Window 10 - LocalTunnel
 
 on: [push, workflow_dispatch]
 
@@ -8,17 +8,6 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Download Ngrok
-      run: |
-        $url = "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip"
-        Invoke-WebRequest -Uri $url -OutFile ngrok.zip
-
-    - name: Extract Ngrok
-      run: Expand-Archive ngrok.zip -DestinationPath ngrok -Force
-
-    - name: Auth Ngrok
-      run: .\ngrok\ngrok.exe config add-authtoken 366YyiVvJcxouzvRkdubw0Eb9CD_4KazgGQnhZGhoR9m59b5
-
     - name: Enable Remote Desktop
       run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
 
@@ -31,6 +20,8 @@ jobs:
     - name: Set Admin Password
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "@cyb3rking" -Force)
 
-    - name: Create Tunnel
-      run: .\ngrok\ngrok.exe tcp 3389
+    - name: Install Node.js Dependencies (LocalTunnel)
+      run: npm install -g localtunnel
 
+    - name: Create Public Tunnel for RDP
+      run: lt --port 3389
