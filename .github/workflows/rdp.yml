@@ -25,5 +25,5 @@ jobs:
     - name: Set Admin Password
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "@cyb3rking" -Force)
 
-    - name: Start Cloudflare Tunnel
-      run: .\cloudflared.exe access tcp --url localhost:3389 --hostname localhost:3389
+    - name: Start Cloudflare Tunnel on Alternate Port
+      run: .\cloudflared.exe access tcp --url localhost:3390 --hostname localhost:3389
