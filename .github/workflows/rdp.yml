@@ -26,6 +26,5 @@ jobs:
       run: |
         $url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
         Invoke-WebRequest -Uri $url -OutFile cloudflared.exe
-
-    - name: Expose VNC Port via Cloudflare Web Tunnel
-      run: .\cloudflared.exe tunnel --url localhost:5900
+- name: Expose VNC Port via Cloudflare TCP Tunnel
+      run: .\cloudflared.exe access tcp --url localhost:5900 --hostname localhost:5900
