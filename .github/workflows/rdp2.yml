@@ -1,4 +1,4 @@
-name: Window 10 - LocalTunnel 6H
+name: Window 10 - Web Directo
 
 on: [push, workflow_dispatch]
 
@@ -8,20 +8,19 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Enable Remote Desktop
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
+    - name: Download and Install TightVNC
+      run: |
+        Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.63/tightvnc-2.8.63-gpl-setup-64bit.msi" -OutFile vnc.msi
+        Start-Process msiexec.exe -ArgumentList '/i vnc.msi /quiet ADDLOCAL="Server" VALUE_PASS=123456' -Wait
 
-    - name: Enable Firewall Rule
-      run: Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+    - name: Start VNC Server
+      run: |
+        net start tvnserver
 
-    - name: Configure Network Level Authentication
-      run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
+    - name: Download Cloudflare Tunnel (Cloudflared)
+      run: |
+        $url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+        Invoke-WebRequest -Uri $url -OutFile cloudflared.exe
 
-    - name: Set Admin Password
-      run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "@cyb3rking" -Force)
-
-    - name: Install Node.js Dependencies (LocalTunnel)
-      run: npm install -g localtunnel
-
-    - name: Create Public Tunnel for RDP
-      run: lt --port 3389
+    - name: Expose VNC Port via Cloudflare Web Tunnel
+      run: .\cloudflared.exe tunnel --url localhost:5900
