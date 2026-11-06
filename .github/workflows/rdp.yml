@@ -1,4 +1,4 @@
-name: Window 10 - Cloudflare
+name: Window 10 - LocalTunnel 6H
 
 on: [push, workflow_dispatch]
 
@@ -8,11 +8,6 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Download Cloudflare Tunnel
-      run: |
-        $url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
-        Invoke-WebRequest -Uri $url -OutFile cloudflared.exe
-
     - name: Enable Remote Desktop
       run: Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -name "fDenyTSConnections" -Value 0
 
@@ -25,5 +20,8 @@ jobs:
     - name: Set Admin Password
       run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "@cyb3rking" -Force)
 
-    - name: Start Cloudflare Tunnel on Alternate Port
-      run: .\cloudflared.exe access tcp --url localhost:3390 --hostname localhost:3389
+    - name: Install Node.js Dependencies (LocalTunnel)
+      run: npm install -g localtunnel
+
+    - name: Create Public Tunnel for RDP
+      run: lt --port 3389
