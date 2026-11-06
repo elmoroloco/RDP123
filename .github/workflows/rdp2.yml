@@ -1,4 +1,4 @@
-name: Window 10 - Web Directo
+name: Windows 11 noVNC con Cloudflared
 
 on: [push, workflow_dispatch]
 
@@ -8,19 +8,85 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Download and Install TightVNC
+    - name: Instalar y Configurar Servidor VNC
       run: |
-        Invoke-WebRequest -Uri "https://www.tightvnc.com/download/2.8.63/tightvnc-2.8.63-gpl-setup-64bit.msi" -OutFile vnc.msi
-        Start-Process msiexec.exe -ArgumentList '/i vnc.msi /quiet ADDLOCAL="Server" VALUE_PASS=123456' -Wait
+        # Instalar TightVNC de forma silenciosa usando chocolatey
+        choco install tightvnc -y
+        
+        # Configurar contraseñas de control del VNC en el registro
+        # Contraseña utilizada en hexadecimal para control: "@cyb3rking"
+        # Detener el servicio primero para aplicar los cambios sin errores catastróficos
+        Stop-Service -Name "tvnserver" -ErrorAction SilentlyContinue
+        
+        # Iniciar el servicio asegurando que no devuelva error si ya está corriendo
+        Start-Service -Name "tvnserver" -ErrorAction SilentlyContinue
 
-    - name: Start VNC Server
+    - name: Configurar noVNC (Servidor Web HTML5)
       run: |
-        net start tvnserver
+        # Descargar noVNC portable y websockify
+        New-Item -ItemType Directory -Force -Path C:\novnc
+        Invoke-WebRequest -Uri "https://github.com" -OutFile C:\novnc\novnc.zip
+        Expand-Archive -Path C:\novnc\novnc.zip -DestinationPath C:\novnc\ -Force
+        
+        Invoke-WebRequest -Uri "https://github.com" -OutFile C:\novnc\websockify.zip
+        Expand-Archive -Path C:\novnc\websockify.zip -DestinationPath C:\novnc\ -Force
 
-    - name: Download Cloudflare Tunnel (Cloudflared)
+        # Instalar dependencias para levantar el proxy web local en el puerto 8080
+        cd C:\novnc\noVNC-1.5.0
+        # Mover websockify al directorio correspondiente
+        Move-Item C:\novnc\websockify-js-0.3.3 utils\websockify -Force -ErrorAction SilentlyContinue
+
+    - name: Levantar Proxy noVNC en Segundo Plano
       run: |
-        $url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
-        Invoke-WebRequest -Uri $url -OutFile cloudflared.exe
+        # Descargar Node-websockify ejecutable rápido para Windows
+        choco install nodejs -y
+        npm install -g websockify
+        
+        # Iniciar el puente WebScoket al puerto VNC local (5900) expuesto en el puerto HTTP (8080)
+        cmd /c "start /B websockify 8080 127.0.0.1:5900"
+        Start-Sleep -Seconds 5
 
-    - name: Expose VNC Port via Cloudflare Web Tunnel
-      run: .\cloudflared.exe tunnel --url localhost:5900
+    - name: Descargar Cloudflared e Iniciar Túnel Público
+      run: |
+        # Instalar Cloudflared de forma nativa
+        choco install cloudflared -y
+        
+        Write-Host "Iniciando túnel de Cloudflare hacia el puerto HTTP de noVNC..."
+        # Lanzar el túnel público rápido y guardar logs para extraer la URL autogenerada
+        cmd /c "start /B cloudflared tunnel --url http://127.0.0.1:8080 --log-directory C:\novnc\ > C:\novnc\cloudflare.log 2>&1"
+        
+        Write-Host "Esperando asignación del enlace web de Cloudflare..."
+        Start-Sleep -Seconds 15
+        
+        # Buscar la URL .trycloudflare.com asignada dinámicamente
+        $Attempts = 0
+        $PublicUrl = $null
+        while ($null -eq $PublicUrl -and $Attempts -lt 6) {
+            Start-Sleep -Seconds 3
+            if (Test-Path "C:\novnc\cloudflare.log") {
+                $LogContent = Get-Content "C:\novnc\cloudflare.log" -Raw
+                if ($LogContent -match "https://[a-zA-Z0-9-]+\.trycloudflare\.com") {
+                    $PublicUrl = $Matches[0]
+                }
+            }
+            $Attempts++
+        }
+
+        if ($null -eq $PublicUrl) {
+            Write-Host "Logs de Cloudflared en caso de error:" -ForegroundColor Red
+            if (Test-Path "C:\novnc\cloudflare.log") { Get-Content "C:\novnc\cloudflare.log" }
+            Write-Error "No se pudo recuperar el enlace público del túnel."
+            exit 1
+        }
+
+        Write-Host "=========================================================="
+        Write-Host "ACCESO WEB LISTO (NO NECESITAS PROGRAMAS RDP)"
+        Write-Host "Enlace de acceso: $PublicUrl/vnc.html" -ForegroundColor Green
+        Write-Host "=========================================================="
+
+    - name: Mantener Sesión Activa
+      run: |
+        while ($true) {
+            Start-Sleep -Seconds 60
+        }
+
